@@ -1,7 +1,7 @@
 {
   "name": "desk-booking-app",
   "version": "1.0.0",
-  "description": "Simple desk booking app",
+  "description": "Desk booking web application",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
@@ -17,4 +17,3 @@
     "jest": "^29.7.0"
   }
 }
-
