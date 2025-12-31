@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  ci:
     runs-on: ubuntu-latest
 
     steps:
@@ -24,6 +24,20 @@ jobs:
 
       - name: Run tests
         run: npm test
-        
-- name: Build Docker image
-  run: docker build -t desk-booking-app .
+
+      - name: Build Docker image
+        run: docker build -t desk-booking-app .
+
+      - name: Scan container for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: desk-booking-app
+
+      - name: Create build record
+        run: echo "Build completed successfully on $(date)" > build.txt
+
+      - name: Upload build record
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-proof
+          path: build.txt
