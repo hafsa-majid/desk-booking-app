@@ -1,10 +1,5 @@
 name: Advanced CI/CD Pipeline
 
-# Give permissions for security scans and API access
-permissions:
-  contents: read
-  security-events: write
-
 on:
   push:
     branches: [ main, develop ]
@@ -21,24 +16,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Run ESLint
         run: npm run lint
         continue-on-error: true
-      
+
       - name: Run Prettier Check
         run: npm run format:check
         continue-on-error: true
-      
+
       - name: Security Audit
         run: npm audit --audit-level=moderate
         continue-on-error: true
@@ -50,30 +45,23 @@ jobs:
     needs: code-quality
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Run tests with coverage
         run: npm run test:coverage
-      
+
       - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
+        uses: actions/upload-artifact@v4
         with:
-          file: ./coverage/coverage-final.json
-          flags: unittests
-          name: codecov-umbrella
-      
-      - name: Archive test results
-        uses: actions/upload-artifact@v3
-        with:
-          name: test-results
+          name: coverage-reports
           path: |
             coverage/
             test-results.xml
@@ -85,24 +73,24 @@ jobs:
     needs: test
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Build application
         run: npm run build
-      
-      - name: Generate SBOM (Software Bill of Materials)
+
+      - name: Generate SBOM
         run: npx @cyclonedx/cyclonedx-npm --output-file sbom.json
-      
+
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: build-artifacts
           path: |
@@ -117,7 +105,7 @@ jobs:
     needs: build
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
@@ -125,21 +113,21 @@ jobs:
           scan-ref: '.'
           format: 'sarif'
           output: 'trivy-results.sarif'
-      
+
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-results.sarif'
-      
+
       - name: OWASP Dependency Check
         uses: dependency-check/Dependency-Check_Action@main
         with:
           project: 'desk-booking-app'
           path: '.'
           format: 'HTML'
-      
+
       - name: Upload security reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: security-reports
           path: |
@@ -158,13 +146,13 @@ jobs:
     steps:
       - name: Trigger Render Staging Deployment
         run: curl -X POST "${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}"
-      
+
       - name: Wait for deployment
         run: sleep 120
-      
+
       - name: Health check
         run: curl -f https://desk-booking-app-staging.onrender.com/health || exit 1
-      
+
       - name: Run smoke tests
         run: curl -f https://desk-booking-app-staging.onrender.com/api/desks || exit 1
 
@@ -183,25 +171,25 @@ jobs:
           echo "Deployment started at $(date)" > deployment-log.txt
           echo "Git SHA: ${{ github.sha }}" >> deployment-log.txt
           echo "Triggered by: ${{ github.actor }}" >> deployment-log.txt
-      
+
       - name: Trigger Render Production Deployment
         run: curl -X POST "${{ secrets.RENDER_PROD_DEPLOY_HOOK }}"
-      
+
       - name: Wait for deployment
         run: sleep 120
-      
+
       - name: Production health check
         run: curl -f https://desk-booking-app-y02r.onrender.com/health || exit 1
-      
+
       - name: Run smoke tests
         run: curl -f https://desk-booking-app-y02r.onrender.com/api/desks || exit 1
-      
+
       - name: Upload deployment log
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: deployment-logs
           path: deployment-log.txt
-      
+
       - name: Notify deployment success
         run: |
           echo "✅ Production deployment successful!"
@@ -222,7 +210,7 @@ jobs:
             echo "❌ Response time too high!"
             exit 1
           fi
-      
+
       - name: API endpoint verification
         run: |
           curl -f https://desk-booking-app-y02r.onrender.com/api/desks
