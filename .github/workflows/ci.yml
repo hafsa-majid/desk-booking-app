@@ -1,5 +1,10 @@
 name: Advanced CI/CD Pipeline
 
+# Give permissions for security scans and API access
+permissions:
+  contents: read
+  security-events: write
+
 on:
   push:
     branches: [ main, develop ]
@@ -59,14 +64,14 @@ jobs:
         run: npm run test:coverage
       
       - name: Upload coverage reports
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v3
         with:
-          files: ./coverage/coverage-final.json
+          file: ./coverage/coverage-final.json
           flags: unittests
           name: codecov-umbrella
       
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
+      - name: Archive test results
+        uses: actions/upload-artifact@v3
         with:
           name: test-results
           path: |
@@ -97,7 +102,7 @@ jobs:
         run: npx @cyclonedx/cyclonedx-npm --output-file sbom.json
       
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: build-artifacts
           path: |
@@ -122,7 +127,7 @@ jobs:
           output: 'trivy-results.sarif'
       
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-results.sarif'
       
@@ -134,7 +139,7 @@ jobs:
           format: 'HTML'
       
       - name: Upload security reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: security-reports
           path: |
@@ -154,24 +159,14 @@ jobs:
       - name: Trigger Render Staging Deployment
         run: curl -X POST "${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}"
       
-      - name: Wait for staging deployment
-        run: |
-          echo "Waiting for staging app..."
-          for i in {1..20}; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://desk-booking-app-staging.onrender.com/health || echo 000)
-            if [ "$STATUS" -eq 200 ]; then
-              echo "✅ Staging app is ready!"
-              exit 0
-            fi
-            echo "Status $STATUS, retrying in 15s..."
-            sleep 15
-          done
-          echo "❌ Staging app did not become ready in time!"
-          exit 1
+      - name: Wait for deployment
+        run: sleep 120
       
-      - name: Run staging smoke tests
-        run: |
-          curl -f https://desk-booking-app-staging.onrender.com/api/desks || exit 1
+      - name: Health check
+        run: curl -f https://desk-booking-app-staging.onrender.com/health || exit 1
+      
+      - name: Run smoke tests
+        run: curl -f https://desk-booking-app-staging.onrender.com/api/desks || exit 1
 
   # Job 6: Deploy to Production (Render)
   deploy-production:
@@ -192,27 +187,17 @@ jobs:
       - name: Trigger Render Production Deployment
         run: curl -X POST "${{ secrets.RENDER_PROD_DEPLOY_HOOK }}"
       
-      - name: Wait for production deployment
-        run: |
-          echo "Waiting for production app..."
-          for i in {1..20}; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://desk-booking-app-y02r.onrender.com/health || echo 000)
-            if [ "$STATUS" -eq 200 ]; then
-              echo "✅ Production app is ready!"
-              exit 0
-            fi
-            echo "Status $STATUS, retrying in 15s..."
-            sleep 15
-          done
-          echo "❌ Production app did not become ready in time!"
-          exit 1
+      - name: Wait for deployment
+        run: sleep 120
       
-      - name: Run production smoke tests
-        run: |
-          curl -f https://desk-booking-app-y02r.onrender.com/api/desks || exit 1
+      - name: Production health check
+        run: curl -f https://desk-booking-app-y02r.onrender.com/health || exit 1
+      
+      - name: Run smoke tests
+        run: curl -f https://desk-booking-app-y02r.onrender.com/api/desks || exit 1
       
       - name: Upload deployment log
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: deployment-logs
           path: deployment-log.txt
@@ -241,4 +226,4 @@ jobs:
       - name: API endpoint verification
         run: |
           curl -f https://desk-booking-app-y02r.onrender.com/api/desks
-          curl -f https://desk-booking-app-y02r.onrender.com/health
+          curl -f https://desk-booking-app-y02r.onrender.com/api/health
