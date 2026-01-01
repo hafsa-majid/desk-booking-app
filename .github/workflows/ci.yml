@@ -66,7 +66,7 @@ jobs:
           name: codecov-umbrella
       
       - name: Archive test results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: test-results
           path: |
@@ -98,7 +98,7 @@ jobs:
           npx @cyclonedx/cyclonedx-npm --output-file sbom.json
       
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: build-artifacts
           path: |
@@ -135,7 +135,7 @@ jobs:
           format: 'HTML'
       
       - name: Upload security reports
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: security-reports
           path: |
@@ -199,7 +199,7 @@ jobs:
           curl -f https://desk-booking-app-y02r.onrender.com/api/desks || exit 1
       
       - name: Upload deployment log
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: deployment-logs
           path: deployment-log.txt
