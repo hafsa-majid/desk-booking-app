@@ -6,10 +6,6 @@ on:
   pull_request:
     branches: [ main ]
 
-permissions:
-  contents: read
-  security-events: write
-
 env:
   NODE_VERSION: '18'
 
@@ -63,18 +59,19 @@ jobs:
         run: npm run test:coverage
       
       - name: Upload coverage reports
-        uses: actions/upload-artifact@v4
+        uses: codecov/codecov-action@v4
         with:
-          name: coverage-reports
-          path: |
-            coverage/coverage-final.json
-            coverage/lcov-report/
+          files: ./coverage/coverage-final.json
+          flags: unittests
+          name: codecov-umbrella
       
-      - name: Archive test results
+      - name: Upload test results
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: test-results.xml
+          path: |
+            coverage/
+            test-results.xml
 
   # Job 3: Build & Containerization Evidence
   build:
@@ -127,7 +124,7 @@ jobs:
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: trivy-results.sarif
+          sarif_file: 'trivy-results.sarif'
       
       - name: OWASP Dependency Check
         uses: dependency-check/Dependency-Check_Action@main
@@ -157,14 +154,24 @@ jobs:
       - name: Trigger Render Staging Deployment
         run: curl -X POST "${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}"
       
-      - name: Wait for deployment
-        run: sleep 60
+      - name: Wait for staging deployment
+        run: |
+          echo "Waiting for staging app..."
+          for i in {1..20}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://desk-booking-app-staging.onrender.com/health || echo 000)
+            if [ "$STATUS" -eq 200 ]; then
+              echo "✅ Staging app is ready!"
+              exit 0
+            fi
+            echo "Status $STATUS, retrying in 15s..."
+            sleep 15
+          done
+          echo "❌ Staging app did not become ready in time!"
+          exit 1
       
-      - name: Health check
-        run: curl -f https://desk-booking-app-staging.onrender.com/health || exit 1
-      
-      - name: Run smoke tests
-        run: curl -f https://desk-booking-app-staging.onrender.com/api/desks || exit 1
+      - name: Run staging smoke tests
+        run: |
+          curl -f https://desk-booking-app-staging.onrender.com/api/desks || exit 1
 
   # Job 6: Deploy to Production (Render)
   deploy-production:
@@ -185,14 +192,24 @@ jobs:
       - name: Trigger Render Production Deployment
         run: curl -X POST "${{ secrets.RENDER_PROD_DEPLOY_HOOK }}"
       
-      - name: Wait for deployment
-        run: sleep 60
+      - name: Wait for production deployment
+        run: |
+          echo "Waiting for production app..."
+          for i in {1..20}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://desk-booking-app-y02r.onrender.com/health || echo 000)
+            if [ "$STATUS" -eq 200 ]; then
+              echo "✅ Production app is ready!"
+              exit 0
+            fi
+            echo "Status $STATUS, retrying in 15s..."
+            sleep 15
+          done
+          echo "❌ Production app did not become ready in time!"
+          exit 1
       
-      - name: Production health check
-        run: curl -f https://desk-booking-app-y02r.onrender.com/health || exit 1
-      
-      - name: Run smoke tests
-        run: curl -f https://desk-booking-app-y02r.onrender.com/api/desks || exit 1
+      - name: Run production smoke tests
+        run: |
+          curl -f https://desk-booking-app-y02r.onrender.com/api/desks || exit 1
       
       - name: Upload deployment log
         uses: actions/upload-artifact@v4
@@ -224,4 +241,4 @@ jobs:
       - name: API endpoint verification
         run: |
           curl -f https://desk-booking-app-y02r.onrender.com/api/desks
-          curl -f https://desk-booking-app-y02r.onrender.com/api/health
+          curl -f https://desk-booking-app-y02r.onrender.com/health
