@@ -3,7 +3,8 @@ name: Advanced CI/CD Pipeline
 # ⚡ Permissions fix for CodeQL SARIF upload
 permissions:
   contents: read
-  security-events: read
+  security-events: write
+  
 
 on:
   push:
