@@ -1,46 +1,36 @@
 // server.js
 const express = require('express');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
-
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Security middleware
-app.use(helmet());
-
-// Rate limiting middleware
-const limiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 60, // limit each IP to 60 requests per windowMs
-});
-app.use(limiter);
-
-// JSON middleware
+// Middleware to parse JSON
 app.use(express.json());
 
-// Health check endpoint (required for CI/CD)
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok', message: 'Desk Booking App is healthy' });
-});
-
-// Example API endpoint for desks (used in smoke tests)
+// Example endpoint for desks (dummy data)
 app.get('/api/desks', (req, res) => {
-  // Example desk data
-  const desks = [
-    { id: 1, name: 'Desk 101', status: 'available' },
-    { id: 2, name: 'Desk 102', status: 'occupied' },
-    { id: 3, name: 'Desk 103', status: 'available' },
-  ];
-  res.status(200).json(desks);
+  res.json([
+    { id: 1, name: 'Desk A', available: true },
+    { id: 2, name: 'Desk B', available: false },
+  ]);
 });
 
-// Root route
-app.get('/', (req, res) => {
-  res.send('Desk Booking App is running!');
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    message: 'Desk Booking App is healthy'
+  });
 });
 
-// Start the server
+// Serve static files (your front-end build)
+app.use(express.static('build'));
+
+// Catch-all for front-end routes (if using React/Vue)
+app.get('*', (req, res) => {
+  res.sendFile(__dirname + '/build/index.html');
+});
+
+// Start server
 app.listen(port, () => {
-  console.log(`Server listening on port ${port}`);
+  console.log(`Desk Booking App listening on port ${port}`);
 });
