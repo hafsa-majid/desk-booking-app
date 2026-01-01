@@ -1,61 +1,232 @@
-name: CI/CD - Desk Booking App
+name: Advanced CI/CD Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [ main, develop ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
+
+env:
+  NODE_VERSION: '18'
 
 jobs:
-  ci:
+  # Job 1: Code Quality & Security Checks
+  code-quality:
+    name: Code Quality Analysis
     runs-on: ubuntu-latest
-
     steps:
-      # 1. Checkout source code
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # 2. Set up Node.js
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
-          node-version: 18
-
-      # 3. Install dependencies
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
       - name: Install dependencies
-        run: npm install
+        run: npm ci
+      
+      - name: Run ESLint
+        run: npm run lint
+        continue-on-error: true
+      
+      - name: Run Prettier Check
+        run: npm run format:check
+        continue-on-error: true
+      
+      - name: Security Audit
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
 
-      # 4. Run unit tests
-      - name: Run tests
-        run: npm test
+  # Job 2: Automated Testing with Coverage
+  test:
+    name: Test & Coverage
+    runs-on: ubuntu-latest
+    needs: code-quality
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run tests with coverage
+        run: npm run test:coverage
+      
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/coverage-final.json
+          flags: unittests
+          name: codecov-umbrella
+      
+      - name: Archive test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: |
+            coverage/
+            test-results.xml
 
-      # 5. Build Docker image (runs in GitHub, not your laptop)
-      - name: Build Docker image
-        if: github.ref == 'refs/heads/main'
-        run: docker build -t desk-booking-app .
+  # Job 3: Build & Containerization Evidence
+  build:
+    name: Build Application
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build application
+        run: npm run build
+      
+      - name: Generate SBOM (Software Bill of Materials)
+        run: |
+          npx @cyclonedx/cyclonedx-npm --output-file sbom.json
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts
+          path: |
+            build/
+            sbom.json
+            package-lock.json
 
-      # 6. Security scan container image (DevSecOps)
-      - name: Scan container for vulnerabilities
-        if: github.ref == 'refs/heads/main'
+  # Job 4: Security Scanning
+  security-scan:
+    name: Security Vulnerability Scan
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: desk-booking-app
-          severity: CRITICAL,HIGH
-
-      # 7. Create build evidence
-      - name: Create build record
-        if: github.ref == 'refs/heads/main'
-        run: echo "Build completed successfully on $(date)" > build.txt
-
-      # 8. Upload build evidence
-      - name: Upload build artifact
-        if: github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
         with:
-          name: build-proof
-          path: build.txt
+          sarif_file: 'trivy-results.sarif'
+      
+      - name: OWASP Dependency Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'desk-booking-app'
+          path: '.'
+          format: 'HTML'
+      
+      - name: Upload security reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-reports
+          path: |
+            trivy-results.sarif
+            dependency-check-report.html
 
-      # 9. Trigger Render deployment (CD)
-      - name: Trigger Render deployment
-        if: github.ref == 'refs/heads/main'
-        run: curl -X POST https://desk-booking-app-y02r.onrender.com
+  # Job 5: Deploy to Staging (Render)
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build, security-scan]
+    if: github.ref == 'refs/heads/develop'
+    environment:
+      name: staging
+      url: https://desk-booking-app-y02r.onrender.com
+    steps:
+      - name: Trigger Render Staging Deployment
+        run: |
+          curl -X POST "${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}"
+      
+      - name: Wait for deployment
+        run: sleep 60
+      
+      - name: Health check
+        run: |
+          curl -f https://desk-booking-app-y02r.onrender.com/health || exit 1
+      
+      - name: Run smoke tests
+        run: |
+          curl -f https://desk-booking-app-y02r.onrender.com/api/desks || exit 1
+
+  # Job 6: Deploy to Production (Render)
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build, security-scan]
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://desk-booking-app-y02r.onrender.com
+    steps:
+      - name: Create deployment record
+        run: |
+          echo "Deployment started at $(date)" > deployment-log.txt
+          echo "Git SHA: ${{ github.sha }}" >> deployment-log.txt
+          echo "Triggered by: ${{ github.actor }}" >> deployment-log.txt
+      
+      - name: Trigger Render Production Deployment
+        run: |
+          curl -X POST "${{ secrets.RENDER_PROD_DEPLOY_HOOK }}"
+      
+      - name: Wait for deployment
+        run: sleep 60
+      
+      - name: Production health check
+        run: |
+          curl -f https://desk-booking-app-y02r.onrender.com/health || exit 1
+      
+      - name: Run smoke tests
+        run: |
+          curl -f https://desk-booking-app-y02r.onrender.com/api/desks || exit 1
+      
+      - name: Upload deployment log
+        uses: actions/upload-artifact@v3
+        with:
+          name: deployment-logs
+          path: deployment-log.txt
+      
+      - name: Notify deployment success
+        run: |
+          echo "✅ Production deployment successful!"
+          echo "URL: https://desk-booking-app-y02r.onrender.com"
+
+  # Job 7: Post-Deployment Monitoring
+  monitor:
+    name: Post-Deployment Verification
+    runs-on: ubuntu-latest
+    needs: deploy-production
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Performance check
+        run: |
+          response_time=$(curl -o /dev/null -s -w '%{time_total}\n' https://desk-booking-app-y02r.onrender.com)
+          echo "Response time: ${response_time}s"
+          # Fail if response time > 3 seconds
+          if (( $(echo "$response_time > 3" | bc -l) )); then
+            echo "❌ Response time too high!"
+            exit 1
+          fi
+      
+      - name: API endpoint verification
+        run: |
+          curl -f https://desk-booking-app-y02r.onrender.com/api/desks
+          curl -f https://desk-booking-app-y02r.onrender.com/api/health
