@@ -6,7 +6,7 @@
   "type": "commonjs",
   "scripts": {
   "start": "node server.js",
-  "build": "echo 'Build completed' && mkdir -p build && cp -r . build/",
+  "build": "echo 'Build completed'",
   "lint": "eslint .",
   "format:check": "prettier --check .",
   "test": "echo \"No tests yet\" && exit 0",
@@ -32,3 +32,4 @@
   "author": "Hafsa Majid",
   "license": "MIT"
 }
+
