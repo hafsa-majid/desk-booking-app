@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+  security-events: write
+
 env:
   NODE_VERSION: '18'
 
@@ -59,19 +63,18 @@ jobs:
         run: npm run test:coverage
       
       - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
+        uses: actions/upload-artifact@v4
         with:
-          file: ./coverage/coverage-final.json
-          flags: unittests
-          name: codecov-umbrella
+          name: coverage-reports
+          path: |
+            coverage/coverage-final.json
+            coverage/lcov-report/
       
       - name: Archive test results
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: |
-            coverage/
-            test-results.xml
+          path: test-results.xml
 
   # Job 3: Build & Containerization Evidence
   build:
@@ -94,8 +97,7 @@ jobs:
         run: npm run build
       
       - name: Generate SBOM (Software Bill of Materials)
-        run: |
-          npx @cyclonedx/cyclonedx-npm --output-file sbom.json
+        run: npx @cyclonedx/cyclonedx-npm --output-file sbom.json
       
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -123,9 +125,9 @@ jobs:
           output: 'trivy-results.sarif'
       
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: 'trivy-results.sarif'
+          sarif_file: trivy-results.sarif
       
       - name: OWASP Dependency Check
         uses: dependency-check/Dependency-Check_Action@main
@@ -150,22 +152,19 @@ jobs:
     if: github.ref == 'refs/heads/develop'
     environment:
       name: staging
-      url: https://desk-booking-app-y02r.onrender.com
+      url: https://desk-booking-app-staging.onrender.com
     steps:
       - name: Trigger Render Staging Deployment
-        run: |
-          curl -X POST "${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}"
+        run: curl -X POST "${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}"
       
       - name: Wait for deployment
         run: sleep 60
       
       - name: Health check
-        run: |
-          curl -f https://desk-booking-app-y02r.onrender.com/health || exit 1
+        run: curl -f https://desk-booking-app-staging.onrender.com/health || exit 1
       
       - name: Run smoke tests
-        run: |
-          curl -f https://desk-booking-app-y02r.onrender.com/api/desks || exit 1
+        run: curl -f https://desk-booking-app-staging.onrender.com/api/desks || exit 1
 
   # Job 6: Deploy to Production (Render)
   deploy-production:
@@ -184,19 +183,16 @@ jobs:
           echo "Triggered by: ${{ github.actor }}" >> deployment-log.txt
       
       - name: Trigger Render Production Deployment
-        run: |
-          curl -X POST "${{ secrets.RENDER_PROD_DEPLOY_HOOK }}"
+        run: curl -X POST "${{ secrets.RENDER_PROD_DEPLOY_HOOK }}"
       
       - name: Wait for deployment
         run: sleep 60
       
       - name: Production health check
-        run: |
-          curl -f https://desk-booking-app-y02r.onrender.com/health || exit 1
+        run: curl -f https://desk-booking-app-y02r.onrender.com/health || exit 1
       
       - name: Run smoke tests
-        run: |
-          curl -f https://desk-booking-app-y02r.onrender.com/api/desks || exit 1
+        run: curl -f https://desk-booking-app-y02r.onrender.com/api/desks || exit 1
       
       - name: Upload deployment log
         uses: actions/upload-artifact@v4
@@ -220,7 +216,6 @@ jobs:
         run: |
           response_time=$(curl -o /dev/null -s -w '%{time_total}\n' https://desk-booking-app-y02r.onrender.com)
           echo "Response time: ${response_time}s"
-          # Fail if response time > 3 seconds
           if (( $(echo "$response_time > 3" | bc -l) )); then
             echo "❌ Response time too high!"
             exit 1
