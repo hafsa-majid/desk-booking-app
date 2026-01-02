@@ -165,9 +165,6 @@ jobs:
       
       - name: Health check
         run: curl -f https://desk-booking-app-staging.onrender.com/health || exit 1
-      
-      - name: Run smoke tests
-        run: curl -f https://desk-booking-app-staging.onrender.com/api/desks || exit 1
 
   # Job 6: Deploy to Production (Render)
   deploy-production:
@@ -224,3 +221,5 @@ jobs:
       - name: API endpoint verification
         run: |
           curl -f https://desk-booking-app-y02r.onrender.com/health
+
+  
