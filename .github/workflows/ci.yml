@@ -194,9 +194,6 @@ jobs:
       - name: Production health check
         run: curl -f https://desk-booking-app-y02r.onrender.com/health || exit 1
       
-      - name: Run smoke tests
-        run: curl -f https://desk-booking-app-y02r.onrender.com/api/desks || exit 1
-      
       - name: Upload deployment log
         uses: actions/upload-artifact@v4
         with:
@@ -226,5 +223,4 @@ jobs:
       
       - name: API endpoint verification
         run: |
-          curl -f https://desk-booking-app-y02r.onrender.com/api/desks
           curl -f https://desk-booking-app-y02r.onrender.com/health

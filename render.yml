@@ -1,6 +1,32 @@
 services:
+  # Production Service
   - type: web
-    name: desk-booking-app
+    name: desk-booking-app-prod
     env: docker
+    region: oregon  # or your preferred region
     plan: free
     branch: main
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+    autoDeploy: true
+
+  # Staging Service
+  - type: web
+    name: desk-booking-app-staging
+    env: docker
+    region: oregon
+    plan: free
+    branch: develop
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: staging
+      - key: PORT
+        value: 3000
+    autoDeploy: true
