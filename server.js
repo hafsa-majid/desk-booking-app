@@ -1,17 +1,11 @@
-// server.js
 const express = require('express');
 const app = express();
+
 const port = process.env.PORT || 3000;
 
-// Middleware to parse JSON
-app.use(express.json());
-
-// Example endpoint for desks (dummy data)
-app.get('/api/desks', (req, res) => {
-  res.json([
-    { id: 1, name: 'Desk A', available: true },
-    { id: 2, name: 'Desk B', available: false },
-  ]);
+// Root route
+app.get('/', (req, res) => {
+  res.send('Desk Booking App is running!');
 });
 
 // Health check endpoint
@@ -22,15 +16,12 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Serve static files (your front-end build)
-app.use(express.static('build'));
+// Only start server if not running tests
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(port, () => {
+    console.log(`Desk Booking App listening on port ${port}`);
+  });
+}
 
-// Catch-all for front-end routes (if using React/Vue)
-app.get('*', (req, res) => {
-  res.sendFile(__dirname + '/build/index.html');
-});
-
-// Start server
-app.listen(port, () => {
-  console.log(`Desk Booking App listening on port ${port}`);
-});
+// Export app for testing
+module.exports = app;
