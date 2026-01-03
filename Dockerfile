@@ -1,19 +1,24 @@
-FROM node:18-alpine
+# --- Stage 1: Build & Dependencies ---
+FROM node:18-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+# Use npm ci for consistent, reproducible builds in CI/CD
+RUN npm ci
 
-# Set working directory
+# --- Stage 2: Final Production Image ---
+FROM node:18-alpine
 WORKDIR /app
 
-# Copy package.json and package-lock.json
-COPY package*.json ./
-
-# Install dependencies (production only)
-RUN npm install --production
-
-# Copy the rest of the application
+# Only copy the production dependencies and source code
+COPY --from=builder /app/node_modules ./node_modules
 COPY . .
 
-# Expose port 3000
+# ✅ Security: Run as a non-privileged user (LO3 Safety)
+USER node
+
 EXPOSE 3000
 
-# Start the server
+# Use NODE_ENV to optimize Express for production
+ENV NODE_ENV=production
+
 CMD ["node", "server.js"]
