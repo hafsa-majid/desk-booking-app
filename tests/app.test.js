@@ -1,3 +1,3 @@
-test('Server starts', () => {
+test("Server starts", () => {
   expect(true).toBe(true);
 });
