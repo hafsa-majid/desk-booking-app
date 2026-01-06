@@ -31,6 +31,14 @@ app.get('/version', (req, res) => {
   });
 });
 
+// ✅ JSON 404 for API routes
+app.use('/api', (req, res) => {
+  res.status(404).json({
+    error: 'API Not Found',
+    path: req.originalUrl,
+  });
+});
+
 // Serve static files (your front-end build)
 app.use(express.static('build'));
 
