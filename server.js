@@ -18,7 +18,7 @@ app.get('/api/desks', (req, res) => {
 app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'ok',
-    message: 'Desk Booking App is healthy'
+    message: 'Desk Booking App is healthy',
   });
 });
 
